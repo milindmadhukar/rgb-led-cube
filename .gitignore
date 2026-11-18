@@ -1,0 +1,9 @@
+# docs/ is a symlink to the Obsidian vault (source of truth), never committed
+/docs
+
+# WLED checkout and build outputs (recreated by firmware/build.sh)
+/firmware/.wled/
+/firmware/dist/
+
+__pycache__/
+.venv/
