@@ -1,0 +1,81 @@
+name: firmware
+
+# Builds WLED (version pinned in firmware/WLED_VERSION) with AudioReactive and the cube_ui
+# usermod for the classic ESP32. Every push uploads the binaries as a workflow artifact;
+# pushing a tag like fw-v1.0.0 also publishes them as a GitHub release.
+
+on:
+  push:
+    branches: [main]
+    tags: ["fw-v*"]
+    paths:
+      - "firmware/**"
+      - ".github/workflows/firmware.yml"
+  pull_request:
+    paths:
+      - "firmware/**"
+      - ".github/workflows/firmware.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: WLED version
+        id: wled
+        run: echo "version=$(tr -d '[:space:]' < firmware/WLED_VERSION)" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch WLED ${{ steps.wled.outputs.version }}
+        run: git clone --depth 1 --branch "${{ steps.wled.outputs.version }}" https://github.com/wled/WLED.git firmware/.wled
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: firmware/.wled/.nvmrc
+          cache: npm
+          cache-dependency-path: firmware/.wled/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: firmware/.wled/requirements.txt
+
+      - name: Install PlatformIO and esptool
+        run: pip install -r firmware/.wled/requirements.txt esptool
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio/.cache
+            ~/.platformio/packages
+            ~/.platformio/platforms
+          key: pio-${{ steps.wled.outputs.version }}-${{ hashFiles('firmware/platformio_override.ini', 'firmware/usermods/**/library.json') }}
+          restore-keys: pio-${{ steps.wled.outputs.version }}-
+
+      - name: Build
+        env:
+          CUBE_FW_TAG: ${{ github.ref_type == 'tag' && github.ref_name || format('g{0}', github.sha) }}
+        run: firmware/build.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ledcube-firmware-${{ github.sha }}
+          path: firmware/dist/*.bin
+          if-no-files-found: error
+
+      - name: Publish release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" firmware/dist/*.bin \
+            --title "Cube firmware ${{ github.ref_name }}" \
+            --notes "WLED ${{ steps.wled.outputs.version }} + AudioReactive + cube_ui. Flash *-factory.bin at 0x0 on a blank ESP32, or upload *-ota.bin from WLED's Security & Updates page."
