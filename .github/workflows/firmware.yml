@@ -2,12 +2,13 @@ name: firmware
 
 # Builds WLED (version pinned in firmware/WLED_VERSION) with AudioReactive and the cube_ui
 # usermod for the classic ESP32. Every push uploads the binaries as a workflow artifact;
-# pushing a tag like fw-v1.0.0 also publishes them as a GitHub release.
+# pushing a tag like v1.0.0 also publishes them as a GitHub release, which the cube's
+# WLED Update page can install with its "Auto update" button.
 
 on:
   push:
     branches: [main]
-    tags: ["fw-v*"]
+    tags: ["v*"]
     paths:
       - "firmware/**"
       - ".github/workflows/firmware.yml"
@@ -78,4 +79,7 @@ jobs:
         run: |
           gh release create "${{ github.ref_name }}" firmware/dist/*.bin \
             --title "Cube firmware ${{ github.ref_name }}" \
-            --notes "WLED ${{ steps.wled.outputs.version }} + AudioReactive + cube_ui. Flash *-factory.bin at 0x0 on a blank ESP32, or upload *-ota.bin from WLED's Security & Updates page."
+            --notes "WLED ${{ steps.wled.outputs.version }} + AudioReactive + cube_ui.
+
+          - **Update the cube:** Config → Security & Updates → **Auto update** (or upload \`*_LEDCube_ESP32.bin\` by hand).
+          - **Blank ESP32:** flash \`*_factory.bin\` at 0x0."
