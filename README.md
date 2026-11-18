@@ -15,6 +15,7 @@ firmware/
   build.sh                  fetch WLED, link the usermod, build, package
   package.sh                OTA bin + factory bin into firmware/dist/
 .github/workflows/firmware.yml   CI build; tags v* publish a release
+tools/ota.sh                     flash a release (or local build) onto the cube over Wi-Fi
 ```
 
 ## Build
@@ -46,13 +47,17 @@ Push a tag such as `v1.0.0`. CI builds it and attaches both binaries to a GitHub
 
 ## Updating over the air
 
-The firmware knows its repo (`WLED_REPO` in `platformio_override.ini`), so the cube can install the
-latest release itself: **Config → Security & Updates → Auto update**. The browser fetches the release's
-`*_LEDCube_ESP32.bin` from GitHub (through WLED's `download.wled.me` relay) and uploads it to the cube,
-so the device you click from needs internet access.
+```bash
+tools/ota.sh <cube-ip-or-mdns>            # latest release
+tools/ota.sh <cube-ip-or-mdns> v0.2.0     # a specific release
+tools/ota.sh <cube-ip-or-mdns> firmware/dist/ledcube-wled-v16.0.1_<ver>_LEDCube_ESP32.bin   # a local build
+```
 
-- Auto update always installs the latest release; it does not compare versions. Pre-releases are skipped.
-- WLED checks the release name (`LEDCube_ESP32`) on upload, so a stock WLED build cannot overwrite the cube
-  by mistake (for example from Home Assistant's WLED update entity).
-- A cube running a build from before `WLED_REPO` was set points at `wled/WLED`. Upload one new
-  `*_LEDCube_ESP32.bin` by hand once; Auto update works from then on.
+The script downloads the release's `*_LEDCube_ESP32.bin` (the repo is public, so no login is needed) and
+uploads it to the cube's `/update`. If a settings PIN or OTA lock is set in Config → Security & Updates,
+unlock it first. WLED checks the release name (`LEDCube_ESP32`) on upload, so a stock WLED build, for example
+one pushed by Home Assistant's WLED update entity, is rejected instead of overwriting the cube.
+
+WLED's own **Auto update** button does not work for this repo: it downloads through `download.wled.me`,
+which only relays WLED-related repos. The Update page still links to this repo's latest release
+(`WLED_REPO` in `platformio_override.ini`).
